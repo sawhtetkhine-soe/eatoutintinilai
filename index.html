@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f6f7f3" />
+    <title>Home — Menus near INTI Nilai</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#" id="homeBrand" aria-label="Home"><span class="brand-mark">H</span><span>Home<span class="brand-period">.</span></span></a>
+      <div class="topbar-note"><span class="status-dot"></span> Restaurants near INTI Nilai</div>
+      <button class="primary-button small-button" type="button" data-open-create>＋ <span>New restaurant</span></button>
+    </header>
+
+    <main>
+      <section id="homeView">
+        <section class="hero">
+          <div class="hero-copy">
+            <div class="eyebrow"><span class="eyebrow-line"></span> RESTAURANTS NEAR INTI NILAI</div>
+            <h1>Restaurants near<br /><em>INTI Nilai.</em></h1>
+            <p>Explore nearby restaurant menus in English or Myanmar, hear Malay dish names, and keep track of each customer’s order.</p>
+            <button class="primary-button" type="button" data-open-create>＋ Add a restaurant</button>
+          </div>
+          <div class="hero-art">
+            <img src="assets/home-hero.jpeg" alt="Home restaurant guide profile photo" />
+          </div>
+        </section>
+
+        <section class="content-section">
+          <div class="section-heading">
+            <div><div class="eyebrow"><span class="eyebrow-line"></span> YOUR COLLECTION</div><h2>Restaurants</h2></div>
+            <div class="section-actions">
+              <span class="restaurant-count" id="restaurantCount">0 restaurants</span>
+            </div>
+          </div>
+          <div id="homeStatus" class="status-message" role="status" aria-live="polite"></div>
+          <div class="restaurant-grid" id="restaurantGrid"></div>
+        </section>
+
+        <section class="home-chat-section">
+          <div class="chat-intro">
+            <div class="eyebrow"><span class="eyebrow-line"></span> YOUR MENU COMPANION</div>
+            <h2>Curious about something?</h2>
+            <p>Ask about any restaurant, dish, or price in your collection.</p>
+          </div>
+          <div class="chat-card">
+            <div class="chat-heading">
+              <div class="bot-avatar">H</div>
+              <div><strong>Ask Home</strong><span>Knows all your restaurant menus</span></div>
+              <span class="chat-online"><span class="status-dot"></span> here</span>
+            </div>
+            <div class="chat-messages" id="homeChatMessages" aria-live="polite">
+              <div class="message bot-message">Welcome! Ask me about a dish, a restaurant, or what’s on the menu. <span class="message-time">Home · just now</span></div>
+            </div>
+            <div class="suggestions" id="homeSuggestions">
+              <button type="button" class="suggestion">What restaurants are here?</button>
+              <button type="button" class="suggestion">Show me vegetarian options</button>
+            </div>
+            <form class="chat-form" id="homeChatForm">
+              <label class="sr-only" for="homeChatInput">Ask about restaurant menus</label>
+              <input id="homeChatInput" type="text" placeholder="Ask about any restaurant or dish..." autocomplete="off" />
+              <button type="submit" aria-label="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14-7-5 14-2-6-7-1Zm7 1 7-8" /></svg></button>
+            </form>
+            <div class="chat-disclaimer">Answers are based on menus saved in this browser.</div>
+          </div>
+        </section>
+      </section>
+
+      <section id="restaurantView" class="restaurant-view" hidden>
+        <button class="back-button" id="backButton" type="button">← All restaurants</button>
+        <div class="detail-heading">
+          <div id="detailHeading"></div>
+          <button class="danger-button" id="deleteRestaurantButton" type="button">Delete restaurant</button>
+        </div>
+        <div id="detailStatus" class="status-message" role="status" aria-live="polite"></div>
+        <div class="detail-layout">
+          <div>
+            <div class="menu-toolbar">
+              <div><div class="eyebrow"><span class="eyebrow-line"></span> THE MENU</div><h2>Good things to eat</h2></div>
+              <div class="menu-toolbar-actions">
+                <div class="language-switch" role="group" aria-label="Menu language">
+                  <button class="language-button active" data-language="en" aria-pressed="true" type="button">English</button>
+                  <button class="language-button" data-language="my" aria-pressed="false" type="button">မြန်မာ</button>
+                </div>
+                <label class="secondary-button photo-button" for="restaurantPhotoInput">＋ <span>Add menu photo</span></label>
+                <button class="secondary-button photo-button" id="addDishButton" type="button">＋ <span>Add dish</span></button>
+                <input id="restaurantPhotoInput" type="file" accept="image/*" multiple hidden />
+              </div>
+            </div>
+            <div class="dish-grid" id="dishGrid"></div>
+            <details class="original-photos">
+              <summary>View original menu photos <span id="originalPhotoCount">0 photos</span></summary>
+              <div class="original-photo-grid" id="originalPhotoGrid"></div>
+            </details>
+          </div>
+          <aside class="bill-card">
+            <div class="bill-top"><div><div class="eyebrow"><span class="eyebrow-line"></span> CUSTOMER ORDERS</div><h2>Order details</h2></div><span class="bill-badge" id="itemCount">0 items</span></div>
+            <div class="customer-order-tools">
+              <label for="customerName">Customer name</label>
+              <input id="customerName" type="text" maxlength="80" placeholder="Enter customer name" />
+              <div class="customer-order-actions">
+                <button class="primary-button" id="saveCustomerOrder" type="button">Save order</button>
+                <button class="secondary-button" id="updateCustomerOrder" type="button" disabled>Update</button>
+                <button class="danger-button" id="deleteCustomerOrder" type="button" disabled>Delete</button>
+              </div>
+              <p class="customer-order-hint" id="customerOrderStatus" role="status" aria-live="polite"></p>
+            </div>
+            <div class="order-list" id="orderList"></div>
+            <div class="bill-total"><span>Estimated total <small>MYR</small></span><strong id="orderTotal">RM 0.00</strong></div>
+            <p class="bill-footnote">Prices are in Malaysian ringgit (MYR).</p>
+            <div class="saved-orders">
+              <h3>Saved customer orders</h3>
+              <div id="savedOrderList"></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <footer><span class="brand footer-brand"><span class="brand-mark">H</span><span>Home<span class="brand-period">.</span></span></span><span>Restaurants near INTI Nilai</span><span>Malay · English · မြန်မာ</span></footer>
+
+    <dialog id="createDialog">
+      <form method="dialog" class="dialog-close-form"><button class="icon-button" aria-label="Close">×</button></form>
+      <div class="eyebrow"><span class="eyebrow-line"></span> GROW YOUR COLLECTION</div>
+      <h2>Add a restaurant</h2>
+      <p class="dialog-description">Name the restaurant, then add menu photos. Home reads dish names and prices and translates them. You can review and correct the results.</p>
+      <form id="createRestaurantForm" class="create-form">
+        <label for="restaurantName">Restaurant name</label>
+        <input id="restaurantName" name="restaurantName" type="text" maxlength="80" placeholder="e.g. Kedai Kopi Melur" required />
+        <label for="createPhotos">Menu photos <span class="label-hint">optional, you can add these later</span></label>
+        <input id="createPhotos" name="photos" type="file" accept="image/*" multiple />
+        <label class="secondary-button folder-button dialog-folder-button" for="folderInput">↥ <span>Import menu folder</span></label>
+        <input id="folderInput" type="file" accept="image/*" webkitdirectory directory multiple hidden />
+        <div class="form-actions"><button class="secondary-button" type="button" id="cancelCreate">Cancel</button><button class="primary-button" type="submit">Create restaurant</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="editDishDialog">
+      <form method="dialog" class="dialog-close-form"><button class="icon-button" aria-label="Close">×</button></form>
+      <div class="eyebrow"><span class="eyebrow-line"></span> CHECK THE TRANSLATION</div>
+      <h2>Edit dish details</h2>
+      <p class="dialog-description">Photo reading and machine translation can make mistakes. Correct the original name or either translation here.</p>
+      <form id="editDishForm" class="create-form">
+        <input id="editDishId" type="hidden" />
+        <label for="editDishName">Original menu text</label>
+        <input id="editDishName" type="text" maxlength="160" required />
+        <label for="editDishEnglish">English</label>
+        <input id="editDishEnglish" type="text" maxlength="300" required />
+        <label for="editDishMyanmar">Myanmar</label>
+        <input id="editDishMyanmar" type="text" maxlength="300" required />
+        <label for="editDishPrice">Price (MYR) <span class="label-hint">leave blank if not shown</span></label>
+        <input id="editDishPrice" type="number" min="0.01" max="9999" step="0.01" />
+        <div class="form-actions"><button class="secondary-button" type="button" id="cancelEditDish">Cancel</button><button class="primary-button" type="submit">Save corrections</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="deleteDialog">
+      <form method="dialog" class="dialog-close-form"><button class="icon-button" aria-label="Close">×</button></form>
+      <div class="eyebrow"><span class="eyebrow-line"></span> REMOVE RESTAURANT</div>
+      <h2>Delete this restaurant?</h2>
+      <p class="dialog-description" id="deleteDescription"></p>
+      <div class="form-actions">
+        <button class="secondary-button" type="button" id="cancelDelete">Keep restaurant</button>
+        <button class="delete-confirm-button" type="button" id="confirmDelete">Delete restaurant</button>
+      </div>
+    </dialog>
+
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js" crossorigin="anonymous"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

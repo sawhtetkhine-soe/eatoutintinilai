@@ -1,0 +1,23 @@
+Functions
+- Title - remove "Find your next favourite table" replace with Near INTI Nilai , Restauratns 
+- web application for auto Translate  restaurant menu photo from  Malay to  English and Myanmar , showing price and enalbe auto calculation for selected items total price and Quality
+
+- indluding chat bot feature for existing menu and price
+
+- using photos from menu folder
+
+- include Audio feature for Malay using a free API service
+
+Design 
+
+- First page - Show Restaurant Names
+- The the list of the use resturants  from under menu folder
+- inside restaurant buttons show related translated menu , price , quality from uploaded photos
+- allow create new restaurants and uplod menu photos
+- the chat bot will be show on first page and can ask all created resturants menu and price
+- add delete resturant feture
+- if price not found in menu image show ?
+- add to see orginal uploaded photos from saved folder
+- add customer name on order for show items and total price for each customer 
+- add feature for update and deleted customer order
+- replace rasa to "Home"
