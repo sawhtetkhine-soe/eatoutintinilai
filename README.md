@@ -1,6 +1,6 @@
-# Home
+#
 
-Home is a browser-based restaurant menu assistant for restaurants near INTI
+This is a browser-based restaurant menu assistant for restaurants near INTI
 Nilai. The home page lists restaurant menus and includes a chat assistant for
 looking up dishes and prices or comparing the same dish across restaurants.
 Restaurant pages show original menu photos above translated menu items, customer
