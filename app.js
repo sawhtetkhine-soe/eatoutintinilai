@@ -84,6 +84,7 @@ const MALAY_GLOSSARY_KEYS = new Set([
   "ayam penyet", "ikan keli penyet", "nasi set budu", "tembikai", "laici", "nenas", "nanas", "kopi", "teh o", "teh", "sirap",
   "limau", "asam boi", "air buah buahan", "tembikai laici", "kopi o", "nescafe o", "ayam", "ikan", "goreng",
 ]);
+let removedUnclearOcrItems = 0;
 const restaurants = loadRestaurants();
 let customerOrders = loadCustomerOrders();
 const quantities = new Map();
@@ -104,12 +105,29 @@ const detailStatus = document.querySelector("#detailStatus");
 const createDialog = document.querySelector("#createDialog");
 const editDishDialog = document.querySelector("#editDishDialog");
 const deleteDialog = document.querySelector("#deleteDialog");
+const compareDialog = document.querySelector("#compareDialog");
 
 function loadRestaurants() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
     if (!Array.isArray(stored)) throw new Error("Saved restaurant data has an unexpected format.");
-    return stored.filter((restaurant) => restaurant && typeof restaurant.id === "string" && typeof restaurant.name === "string" && Array.isArray(restaurant.items));
+    const validRestaurants = stored.filter((restaurant) => restaurant && typeof restaurant.id === "string" && typeof restaurant.name === "string" && Array.isArray(restaurant.items));
+    for (const restaurant of validRestaurants) {
+      const originalCount = restaurant.items.length;
+      restaurant.items = restaurant.items.filter((item) => item && (item.category !== "Review photo reading"
+        || item.translationReviewed
+        || isCredibleOcrMenuItem(item.sourceText || item.name, item.price, Number(item.photoConfidence) || 0)));
+      removedUnclearOcrItems += originalCount - restaurant.items.length;
+    }
+    if (removedUnclearOcrItems) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(validRestaurants));
+      } catch (error) {
+        console.error("Could not save the cleanup of unclear OCR menu items.", error);
+      }
+      console.info(`Removed ${removedUnclearOcrItems} unclear OCR menu item(s) from saved restaurant menus.`);
+    }
+    return validRestaurants;
   } catch (error) {
     console.error("Could not load saved restaurants.", error);
     return [];
@@ -263,7 +281,7 @@ function setStatus(element, message, isError = false) {
 
 function formatPrice(price) {
   const value = Number(price);
-  return price === null || price === "" || !Number.isFinite(value) ? "?" : `RM ${value.toFixed(2)}`;
+  return price === null || price === undefined || price === "" || !Number.isFinite(value) ? "Price not found" : `RM ${value.toFixed(2)}`;
 }
 
 function renderRestaurants() {
@@ -342,7 +360,7 @@ function renderDishes(restaurant) {
       <div class="empty-state">
         <div class="empty-icon" aria-hidden="true">📷</div>
         <h3>No menu dishes yet.</h3>
-        <p>Upload a clear photo of the menu. Home will read dish names and translate them. Prices not found are shown as ?.</p>
+        <p>Upload a clear photo of the menu. Home will read dish names and translate them. Items without a readable price show “Price not found.”</p>
         <label class="primary-button" for="restaurantPhotoInput">＋ Upload menu photos</label>
       </div>
     `;
@@ -361,6 +379,7 @@ function renderDishes(restaurant) {
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6v4h3l4 3V3L5 6H2Zm9-1a4 4 0 0 1 0 6m2-8a7 7 0 0 1 0 10" /></svg>
             Hear Malay
           </button>
+          <button class="edit-dish-button compare-dish-button" type="button" data-compare="${escapeHtml(item.id)}">Compare prices</button>
           <button class="edit-dish-button" type="button" data-edit="${escapeHtml(item.id)}">Correct translation</button>
           <button class="add-button" type="button" data-add="${escapeHtml(item.id)}" aria-label="Add ${escapeHtml(item.name)} to your order">+</button>
         </div>
@@ -401,6 +420,7 @@ function renderOrder() {
   let total = 0;
   let count = 0;
   let hasUnknownPrice = false;
+  let hasPricedItems = false;
   const rows = [];
   for (const [id, quantity] of quantities) {
     const item = restaurant.items.find((entry) => entry.id === id);
@@ -408,7 +428,10 @@ function renderOrder() {
     count += quantity;
     const price = getDishPrice(item);
     if (price == null || !Number.isFinite(price)) hasUnknownPrice = true;
-    else total += price * quantity;
+    else {
+      hasPricedItems = true;
+      total += price * quantity;
+    }
     rows.push(`
       <div class="order-row">
         <span class="order-dish">${escapeHtml(getDisplayDishName(item))}</span>
@@ -416,14 +439,16 @@ function renderOrder() {
           <button class="quantity-button" type="button" data-change="${escapeHtml(id)}" data-delta="-1" aria-label="Remove one ${escapeHtml(item.name)}">−</button>
           <span class="quantity-number">${quantity}</span>
           <button class="quantity-button" type="button" data-change="${escapeHtml(id)}" data-delta="1" aria-label="Add one ${escapeHtml(item.name)}">+</button>
-          <span class="order-subtotal">${price == null ? "?" : formatPrice(price * quantity)}</span>
+          <span class="order-subtotal">${price == null ? "Price not found" : formatPrice(price * quantity)}</span>
         </div>
       </div>
     `);
   }
   document.querySelector("#orderList").innerHTML = rows.length ? rows.join("") : '<p class="empty-order">Your table is waiting. Add a dish to get started.</p>';
   document.querySelector("#itemCount").textContent = `${count} ${count === 1 ? "item" : "items"}`;
-  document.querySelector("#orderTotal").textContent = hasUnknownPrice ? `${formatPrice(total)} + ?` : formatPrice(total);
+  document.querySelector("#orderTotal").textContent = hasUnknownPrice
+    ? `${hasPricedItems ? `${formatPrice(total)} + ` : ""}Price not found`
+    : formatPrice(total);
   document.querySelector("#updateCustomerOrder").disabled = !activeCustomerOrderId;
   document.querySelector("#deleteCustomerOrder").disabled = !activeCustomerOrderId;
   renderSavedCustomerOrders(restaurant);
@@ -503,18 +528,22 @@ function renderSavedCustomerOrders(restaurant) {
     const descriptions = [];
     let total = 0;
     let hasUnknown = false;
+    let hasPricedItems = false;
     for (const entry of order.items) {
       const item = restaurant.items.find((candidate) => candidate.id === entry.id);
       if (!item || entry.quantity < 1) continue;
       descriptions.push(`${getDisplayDishName(item)} × ${entry.quantity}`);
       const price = getDishPrice(item);
       if (price == null || !Number.isFinite(price)) hasUnknown = true;
-      else total += price * entry.quantity;
+      else {
+        hasPricedItems = true;
+        total += price * entry.quantity;
+      }
     }
     return `<button class="saved-order-card ${order.id === activeCustomerOrderId ? "selected" : ""}" type="button" data-load-order="${escapeHtml(order.id)}">
       <strong>${escapeHtml(order.customerName)}</strong>
       <span>${escapeHtml(descriptions.join(", ") || "No available items")}</span>
-      <small>Total: ${hasUnknown ? `${formatPrice(total)} + ?` : formatPrice(total)}</small>
+      <small>Total: ${hasUnknown ? `${hasPricedItems ? `${formatPrice(total)} + ` : ""}Price not found` : formatPrice(total)}</small>
     </button>`;
   }).join("") : '<p class="saved-orders-empty">No customer orders saved for this restaurant yet.</p>';
 }
@@ -614,6 +643,52 @@ function normalizeText(text) {
   return String(text).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 
+function getMenuItemAliases(item) {
+  const aliases = new Set();
+  for (const value of [item.name, item.sourceText, item.english]) {
+    if (!value) continue;
+    const normalized = normalizeText(value);
+    if (normalized) aliases.add(normalized);
+    const known = knownTranslation(value);
+    if (known?.english) aliases.add(normalizeText(known.english));
+  }
+  return aliases;
+}
+
+function findEquivalentMenuItems(item) {
+  const aliases = getMenuItemAliases(item);
+  return restaurants.flatMap((restaurant) => restaurant.items
+    .filter((candidate) => [...getMenuItemAliases(candidate)].some((alias) => aliases.has(alias)))
+    .map((candidate) => ({ restaurant, item: candidate })));
+}
+
+function openComparison(itemId) {
+  const restaurant = getActiveRestaurant();
+  const item = restaurant?.items.find((entry) => entry.id === itemId);
+  if (!restaurant || !item) return;
+  const matches = findEquivalentMenuItems(item);
+  const current = matches.filter((match) => match.restaurant.id === restaurant.id);
+  const otherRestaurants = matches.filter((match) => match.restaurant.id !== restaurant.id)
+    .sort((left, right) => {
+      const leftPrice = getDishPrice(left.item);
+      const rightPrice = getDishPrice(right.item);
+      if (leftPrice == null) return rightPrice == null ? left.restaurant.name.localeCompare(right.restaurant.name) : 1;
+      if (rightPrice == null) return -1;
+      return leftPrice - rightPrice;
+    });
+  document.querySelector("#compareTitle").textContent = `Compare ${getDisplayDishName(item)}`;
+  const results = [...current, ...otherRestaurants];
+  document.querySelector("#comparisonResults").innerHTML = results.length > 1
+    ? results.map(({ restaurant: matchedRestaurant, item: matchedItem }) => `
+      <div class="comparison-row ${matchedRestaurant.id === restaurant.id ? "comparison-current" : ""}">
+        <span><strong>${escapeHtml(matchedRestaurant.name)}</strong><small>${escapeHtml(getDisplayDishName(matchedItem))}</small></span>
+        <b>${escapeHtml(formatPrice(getDishPrice(matchedItem)))}</b>
+      </div>
+    `).join("")
+    : '<p class="comparison-empty">No other restaurant has a matching dish in its saved menu yet. Add another menu to compare prices.</p>';
+  compareDialog.showModal();
+}
+
 function answerMenuQuestion(question) {
   const query = normalizeText(question);
   const allItems = restaurants.flatMap((restaurant) => restaurant.items.map((item) => ({ item, restaurant })));
@@ -631,6 +706,21 @@ function answerMenuQuestion(question) {
     return allItems.length
       ? allItems.map(({ item, restaurant }) => `${getDisplayDishName(item)} at ${restaurant.name} — ${formatPrice(getDishPrice(item))}`).join("\n")
       : "The restaurants are saved, but their menu photos haven’t been added yet.";
+  }
+  if (/(compare|cheaper|cheapest|lowest price|price comparison)/.test(query)) {
+    const match = allItems.find(({ item }) => [...getMenuItemAliases(item)]
+      .some((alias) => alias.length >= 4 && query.includes(alias)));
+    if (!match) return "Which dish would you like to compare? For example, “Compare nasi lemak prices.”";
+    const matches = findEquivalentMenuItems(match.item).sort((left, right) => {
+      const leftPrice = getDishPrice(left.item);
+      const rightPrice = getDishPrice(right.item);
+      if (leftPrice == null) return rightPrice == null ? left.restaurant.name.localeCompare(right.restaurant.name) : 1;
+      if (rightPrice == null) return -1;
+      return leftPrice - rightPrice;
+    });
+    return matches.length > 1
+      ? `${getDisplayDishName(match.item)} price comparison: ${matches.map(({ item, restaurant }) => `${restaurant.name} — ${formatPrice(getDishPrice(item))}`).join("; ")}.`
+      : `I found ${getDisplayDishName(match.item)} at ${match.restaurant.name} (${formatPrice(getDishPrice(match.item))}), but no other restaurant has a matching menu item yet.`;
   }
   const restaurantMatch = restaurants.find((restaurant) => query.includes(normalizeText(restaurant.name)));
   const scopedItems = restaurantMatch
@@ -673,33 +763,91 @@ function parsePrice(text) {
   const match = text.match(/(?:RM|MYR|ringgit)\s*(\d{1,4}(?:[.,]\d{1,2})?|\d{1,4})|(\d{1,4}[.,]\d{2})\s*$/i);
   const raw = match?.[1] || match?.[2];
   if (!raw) return null;
-  const price = Number(raw.replace(",", "."));
+  let price = Number(raw.replace(",", "."));
+  if (!/[.,]\d{1,2}$/.test(raw) && price >= 100 && price < 1000) price /= 100;
   return Number.isFinite(price) && price > 0 && price < 1000 ? price : null;
 }
 
-function parseOcrItems(text) {
-  const lines = text.split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
+function parseOcrItems(recognition) {
+  const lines = Array.isArray(recognition?.lines)
+    ? recognition.lines
+      .filter((line) => line?.text && line.bbox && Number.isFinite(Number(line.confidence)))
+      .map((line) => ({
+        text: line.text.replace(/\s+/g, " ").trim(),
+        confidence: Number(line.confidence),
+        centerY: (Number(line.bbox.y0) + Number(line.bbox.y1)) / 2,
+        x0: Number(line.bbox.x0) || 0,
+        height: Number(line.bbox.y1) - Number(line.bbox.y0),
+      }))
+      .filter((line) => line.text && line.confidence >= 25 && Number.isFinite(line.centerY))
+      .sort((left, right) => left.centerY - right.centerY)
+    : String(recognition?.text || recognition || "").split(/\r?\n/)
+      .map((text) => ({ text: text.replace(/\s+/g, " ").trim(), confidence: Number(recognition?.confidence) || 0, centerY: null }))
+      .filter((line) => line.text);
+
+  const nameLines = [];
+  const prices = [];
   const candidates = [];
-  let pendingName = "";
   for (const line of lines) {
-    const price = parsePrice(line);
-    if (price === null) {
-      if (line.length >= 3 && !/^(menu|makanan|minuman|harga|price|rm|myr)$/i.test(line)) {
-        const cleaned = cleanOcrName(line);
-        if (cleaned.length >= 3 && pendingName) candidates.push({ name: pendingName, price: null });
-        if (cleaned.length >= 3) pendingName = cleaned;
-      }
+    const price = parsePrice(line.text);
+    const name = cleanOcrName(line.text
+      .replace(/(?:RM|MYR|ringgit)\s*\d{1,4}(?:[.,]\d{1,2})?/gi, " ")
+      .replace(/\d{1,4}[.,]\d{2}/g, " "));
+    if (name && price !== null) {
+      candidates.push({ name, price, confidence: line.confidence });
       continue;
     }
-    const marker = line.match(/(?:RM|MYR|ringgit)\s*\d|\d{1,4}[.,]\d{2}\s*$/i);
-    let name = marker ? line.replace(/(?:RM|MYR|ringgit)\s*\d{1,4}(?:[.,]\d{1,2})?|\d{1,4}[.,]\d{2}\s*$/i, "").trim() : "";
-    if (name.length < 3) name = pendingName;
-    pendingName = "";
-    name = cleanOcrName(name);
-    if (name.length >= 3 && !/^\d+$/.test(name)) candidates.push({ name, price });
+    if (name) nameLines.push({ ...line, name });
+    else if (price !== null && line.centerY != null) prices.push({ price, centerY: line.centerY, confidence: line.confidence });
   }
-  if (pendingName.length >= 3) candidates.push({ name: pendingName, price: null });
-  return candidates.filter((candidate, index) => candidates.findIndex((entry) => normalizeText(entry.name) === normalizeText(candidate.name)) === index);
+
+  const dishRows = [];
+  for (const line of nameLines) {
+    const row = line.centerY == null ? null : dishRows.find((entry) => entry.centerY != null && Math.abs(entry.centerY - line.centerY) <= 18);
+    if (!row) {
+      dishRows.push({ lines: [line], centerY: line.centerY });
+      continue;
+    }
+    row.lines.push(line);
+    row.centerY = row.lines.reduce((sum, entry) => sum + entry.centerY, 0) / row.lines.length;
+  }
+  const dishes = dishRows.map((row) => {
+    const orderedLines = row.lines.sort((left, right) => (left.x0 || 0) - (right.x0 || 0));
+    return {
+      name: cleanOcrName(orderedLines.map((line) => line.name).join(" ")),
+      confidence: orderedLines.reduce((sum, line) => sum + line.confidence, 0) / orderedLines.length,
+      centerY: row.centerY,
+      price: null,
+    };
+  });
+  const measuredHeights = lines.map((line) => line.height).filter((height) => Number.isFinite(height) && height > 0).sort((left, right) => left - right);
+  const medianHeight = measuredHeights[Math.floor(measuredHeights.length / 2)] || 24;
+  const maxPriceDistance = Math.min(34, Math.max(24, medianHeight * 1.1));
+  let lastMatchedDish = -1;
+  for (const priceLine of prices.sort((left, right) => left.centerY - right.centerY)) {
+    let nearestIndex = -1;
+    let nearestDistance = Infinity;
+    for (let index = lastMatchedDish + 1; index < dishes.length; index += 1) {
+      const dish = dishes[index];
+      if (dish.centerY == null) continue;
+      const distance = Math.abs(dish.centerY - priceLine.centerY);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestIndex = index;
+      }
+    }
+    if (nearestIndex >= 0 && nearestDistance <= maxPriceDistance) {
+      dishes[nearestIndex].price = priceLine.price;
+      lastMatchedDish = nearestIndex;
+    }
+  }
+
+  candidates.push(...dishes);
+  const credibleCandidates = candidates.filter((candidate) => isCredibleOcrMenuItem(candidate.name, candidate.price, candidate.confidence));
+  return credibleCandidates.filter((candidate, index) => {
+    const key = `${normalizeText(candidate.name)}-${candidate.price ?? ""}`;
+    return credibleCandidates.findIndex((entry) => `${normalizeText(entry.name)}-${entry.price ?? ""}` === key) === index;
+  });
 }
 
 function cleanOcrName(text) {
@@ -707,8 +855,51 @@ function cleanOcrName(text) {
     .replace(/[^A-Za-zÀ-ÿ\s'-]/g, " ")
     .replace(/\b(?:RM|MYR)\b/gi, " ")
     .split(/\s+/)
-    .filter((token) => token.length >= 3 || token.toLowerCase() === "o");
+    .filter((token) => token.length >= 3 || ["o", "and"].includes(token.toLowerCase()));
   return tokens.join(" ").replace(/\s+/g, " ").trim();
+}
+
+function getEditDistance(left, right) {
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    let diagonal = previous[0];
+    previous[0] = leftIndex;
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      const above = previous[rightIndex];
+      previous[rightIndex] = Math.min(
+        previous[rightIndex] + 1,
+        previous[rightIndex - 1] + 1,
+        diagonal + (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1),
+      );
+      diagonal = above;
+    }
+  }
+  return previous[right.length];
+}
+
+function findOcrKnownTranslation(text) {
+  const direct = findKnownTranslation(text);
+  if (direct) return direct;
+  const normalized = normalizeText(text).replace(/\s/g, "");
+  if (normalized.length < 4) return null;
+  const matches = Object.keys(DISH_TRANSLATIONS)
+    .filter((key) => Math.abs(key.replace(/\s/g, "").length - normalized.length) <= 2)
+    .map((key) => ({ key, distance: getEditDistance(normalized, key.replace(/\s/g, "")) }))
+    .filter(({ key, distance }) => distance <= (key.length >= 9 ? 2 : 1))
+    .sort((left, right) => left.distance - right.distance);
+  if (!matches.length || (matches[1] && matches[1].distance === matches[0].distance)) return null;
+  return { key: matches[0].key, translation: DISH_TRANSLATIONS[matches[0].key] };
+}
+
+function isCredibleOcrMenuItem(name, price, confidence) {
+  const cleaned = cleanOcrName(name);
+  if (cleaned.length < 3) return false;
+  if (findOcrKnownTranslation(cleaned)) return true;
+  const words = normalizeText(cleaned).split(" ").filter((word) => word.length >= 3);
+  const hasPrice = price !== null && price !== undefined && price !== "" && Number.isFinite(Number(price));
+  if (hasPrice && confidence >= 70 && words.length >= 2 && cleaned.length >= 7) return true;
+  if (hasPrice && confidence >= 85 && words.length === 1 && words[0].length >= 4) return true;
+  return !hasPrice && confidence >= 88 && words.length >= 2 && cleaned.length >= 8;
 }
 
 async function translateText(text, target) {
@@ -748,7 +939,7 @@ function getPhotoStatusTarget() {
 }
 
 async function translateMenuLine(candidate, confidence) {
-  const match = findKnownTranslation(candidate.name);
+  const match = findOcrKnownTranslation(candidate.name) || findKnownTranslation(candidate.name);
   const known = match?.translation;
   const isMalay = isLikelyMalay(candidate.name) || MALAY_GLOSSARY_KEYS.has(match?.key);
   const myanmar = known?.myanmar || await translateText(candidate.name, "my");
@@ -774,6 +965,10 @@ async function recognizeMenuPhoto(file) {
     try {
       if (!ocrWorkerPromise) ocrWorkerPromise = window.Tesseract.createWorker("eng+msa");
       const worker = await ocrWorkerPromise;
+      await worker.setParameters({
+        preserve_interword_spaces: "1",
+        tessedit_pageseg_mode: window.Tesseract.PSM.SPARSE_TEXT,
+      });
       const result = await worker.recognize(file);
       return result.data;
     } catch (error) {
@@ -811,27 +1006,34 @@ async function processPhoto(file, restaurantId, sourcePath = "") {
       setStatus(statusTarget, `No text was found in ${file.name}. Try a clearer, well-lit photo.`, true);
       return;
     }
-    if (recognized.confidence < 35) {
+    if (recognized.confidence < 25) {
       setStatus(statusTarget, `The text in ${file.name} is too unclear to read reliably (${Math.round(recognized.confidence)}% confidence). Retake it straight-on with better lighting.`, true);
       return;
     }
-    const candidates = parseOcrItems(extracted);
+    const candidates = parseOcrItems(recognized);
     if (!candidates.length) {
-      setStatus(statusTarget, `Text was found in ${file.name}, but no dish names could be recognized. Make sure the menu text is readable.`, true);
+      setStatus(statusTarget, `Text was found in ${file.name}, but no menu items could be read reliably. The original photo was saved; try a clear, straight-on photo or add dishes manually.`, true);
       return;
     }
     const translatedItems = [];
     for (let index = 0; index < candidates.length; index += 1) {
       setStatus(statusTarget, `Translating dish ${index + 1} of ${candidates.length} from ${file.name}…`);
-      translatedItems.push(await translateMenuLine(candidates[index], recognized.confidence));
+      translatedItems.push(await translateMenuLine(candidates[index], candidates[index].confidence || recognized.confidence));
     }
     const existing = new Set(restaurant.items.map((item) => `${normalizeText(item.name)}-${item.price}`));
-    restaurant.items.push(...translatedItems.filter((item) => !existing.has(`${normalizeText(item.name)}-${item.price}`)));
+    const newItems = translatedItems.filter((item) => !existing.has(`${normalizeText(item.name)}-${item.price}`));
+    if (!newItems.length) {
+      setStatus(statusTarget, `No new menu items were added from ${file.name}; the recognized dishes are already on this menu.`);
+      return;
+    }
+    restaurant.items.push(...newItems);
     if (!saveRestaurants()) return;
     if (activeRestaurantId === restaurantId) renderDetail();
     else renderRestaurants();
-    const reviewNote = recognized.confidence < 65 ? " Please review the highlighted names and photo quality." : "";
-    setStatus(statusTarget, `Added ${translatedItems.length} dish${translatedItems.length === 1 ? "" : "es"} from ${file.name}.${reviewNote}`);
+    const reviewNote = newItems.some((item) => item.category === "Review photo reading")
+      ? " Please review the highlighted names and photo quality."
+      : "";
+    setStatus(statusTarget, `Added ${newItems.length} menu item${newItems.length === 1 ? "" : "s"} from ${file.name}. Unclear text was ignored.${reviewNote}`);
   } catch (error) {
     console.error(`Could not process menu photo “${file.name}”.`, error);
     setStatus(statusTarget, `Couldn’t process ${file.name}: ${error.message || "check your connection and try a clearer image."}`, true);
@@ -931,7 +1133,8 @@ function openDishEditor(id) {
   document.querySelector("#editDishName").value = item?.name || "";
   document.querySelector("#editDishEnglish").value = item?.english || "";
   document.querySelector("#editDishMyanmar").value = item?.myanmar || "";
-  document.querySelector("#editDishPrice").value = item ? getDishPrice(item).toFixed(2) : "";
+  const price = item ? getDishPrice(item) : null;
+  document.querySelector("#editDishPrice").value = price == null ? "" : price.toFixed(2);
   editDishDialog.querySelector("h2").textContent = item ? "Edit dish details" : "Add a dish";
   editDishDialog.querySelector(".dialog-description").textContent = item
     ? "Photo reading and machine translation can make mistakes. Correct the original name or either translation here."
@@ -1089,9 +1292,11 @@ document.querySelector("#folderInput").addEventListener("change", async (event) 
 
 document.querySelector("#dishGrid").addEventListener("click", (event) => {
   const speakButton = event.target.closest("[data-speak]");
+  const compareButton = event.target.closest("[data-compare]");
   const editButton = event.target.closest("[data-edit]");
   const addButton = event.target.closest("[data-add]");
   if (speakButton) speakMalay(speakButton.dataset.speak);
+  if (compareButton) openComparison(compareButton.dataset.compare);
   if (editButton) openDishEditor(editButton.dataset.edit);
   if (addButton) changeQuantity(addButton.dataset.add, 1);
 });
@@ -1130,4 +1335,7 @@ document.querySelector("#homeSuggestions").addEventListener("click", (event) => 
 });
 
 renderRestaurants();
+if (removedUnclearOcrItems) {
+  setStatus(homeStatus, `Removed ${removedUnclearOcrItems} unclear OCR item${removedUnclearOcrItems === 1 ? "" : "s"} from saved menus.`);
+}
 syncMenuFolder();

@@ -1,10 +1,19 @@
 # Home
 
-Home is a browser-based restaurant menu translator and customer-order calculator
-for restaurants near INTI Nilai. It scans the `menu/` directory for restaurant
-subfolders and photos, reads Malay and English menu text with Tesseract.js, and
-translates dish names to English and Myanmar. Common dishes use a reviewed
-glossary; unfamiliar translations can be corrected in the app.
+Home is a browser-based restaurant menu assistant for restaurants near INTI
+Nilai. The home page lists restaurant menus and includes a chat assistant for
+looking up dishes and prices or comparing the same dish across restaurants.
+Restaurant pages show original menu photos above translated menu items, customer
+orders, and price comparisons. Malay menu names are shown with English and
+Myanmar translations; English menu names are shown with Myanmar translations.
+Items without a readable price are labelled **Price not found**.
+
+The app scans the `menu/` directory for restaurant subfolders and photos, reads
+Malay and English menu text with Tesseract.js sparse-text recognition, pairs
+nearby dish names and prices, and filters unclear text fragments before adding
+items. Common OCR misspellings use the reviewed glossary; unfamiliar
+translations can be corrected in the app. Unreviewed, low-confidence OCR
+fragments already saved as menu items are removed when the app loads.
 
 ## Run locally
 
@@ -34,19 +43,20 @@ deployment.
 
 Photo recognition and translation use online services and need an internet
 connection. OCR shows its confidence as a photo-quality indicator; unclear
-results are flagged for review. A menu item without a readable price is shown as
-`?` and can still be added to an order. Use **Correct translation** to update a
-dish name, translations, or price.
+results are flagged for review. A menu item without a readable price is shown as **Price not found** and can
+still be added to an order. Use **Compare prices** on a dish to see its saved
+prices at other restaurants, or ask the chat assistant to compare a dish by
+name. Use **Correct translation** to update a dish name, translations, or price.
 
 The **Hear Malay** action uses Google Translate's free text-to-speech endpoint,
 with the device's Malay voice as a fallback. Availability may vary by network
 and browser.
 
-Original uploaded photos are saved in this browser's IndexedDB and can be
-viewed under **View original menu photos**. Photos already stored in the
-`menu/` folder are displayed from their original files. Restaurant menus and
-customer orders are saved in this browser's local storage. Customer orders can
-be loaded, updated, or deleted from the restaurant page.
+Original uploaded photos are saved in this browser's IndexedDB and shown at the
+top of each restaurant page. Photos already stored in the `menu/` folder are
+displayed from their original files. Restaurant menus and customer orders are
+saved in this browser's local storage. Customer orders can be loaded, updated,
+or deleted from the restaurant page.
 
 Deleting a restaurant removes its saved menu, customer orders, and browser
 copies of uploaded photos. Source photos in the `menu/` folder are not deleted.

@@ -26,8 +26,10 @@
             <p>Explore nearby restaurant menus in English or Myanmar, hear Malay dish names, and keep track of each customer’s order.</p>
             <button class="primary-button" type="button" data-open-create>＋ Add a restaurant</button>
           </div>
-          <div class="hero-art">
-            <img src="assets/home-hero.jpeg" alt="Home restaurant guide profile photo" />
+          <div class="hero-art" aria-hidden="true">
+            <span class="hero-art-label">A TASTE OF NILAI</span>
+            <span class="hero-art-plate">🍛</span>
+            <span class="hero-art-caption">Good food, shared moments.</span>
           </div>
         </section>
 
@@ -80,6 +82,13 @@
         <div id="detailStatus" class="status-message" role="status" aria-live="polite"></div>
         <div class="detail-layout">
           <div>
+            <section class="original-photos" aria-labelledby="originalPhotosHeading">
+              <div class="photo-section-heading">
+                <div><div class="eyebrow"><span class="eyebrow-line"></span> ORIGINAL MENU</div><h2 id="originalPhotosHeading">Menu photos</h2></div>
+                <span id="originalPhotoCount">0 photos</span>
+              </div>
+              <div class="original-photo-grid" id="originalPhotoGrid"></div>
+            </section>
             <div class="menu-toolbar">
               <div><div class="eyebrow"><span class="eyebrow-line"></span> THE MENU</div><h2>Good things to eat</h2></div>
               <div class="menu-toolbar-actions">
@@ -93,10 +102,6 @@
               </div>
             </div>
             <div class="dish-grid" id="dishGrid"></div>
-            <details class="original-photos">
-              <summary>View original menu photos <span id="originalPhotoCount">0 photos</span></summary>
-              <div class="original-photo-grid" id="originalPhotoGrid"></div>
-            </details>
           </div>
           <aside class="bill-card">
             <div class="bill-top"><div><div class="eyebrow"><span class="eyebrow-line"></span> CUSTOMER ORDERS</div><h2>Order details</h2></div><span class="bill-badge" id="itemCount">0 items</span></div>
@@ -168,6 +173,14 @@
         <button class="secondary-button" type="button" id="cancelDelete">Keep restaurant</button>
         <button class="delete-confirm-button" type="button" id="confirmDelete">Delete restaurant</button>
       </div>
+    </dialog>
+
+    <dialog id="compareDialog">
+      <form method="dialog" class="dialog-close-form"><button class="icon-button" aria-label="Close comparison">×</button></form>
+      <div class="eyebrow"><span class="eyebrow-line"></span> MENU PRICE CHECK</div>
+      <h2 id="compareTitle">Compare this dish</h2>
+      <p class="dialog-description">Prices are taken from the saved menu photos for each restaurant.</p>
+      <div id="comparisonResults" class="comparison-results"></div>
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js" crossorigin="anonymous"></script>
